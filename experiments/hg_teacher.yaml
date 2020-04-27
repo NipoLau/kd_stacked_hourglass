@@ -1,0 +1,7 @@
+MODEL:
+  NAME: 'teacher_hourglass'
+  PRETRAINED: 'experiments/models/checkpoint.pt'
+  EXTRA:
+    NUM_FEATURES: 256
+    NUM_STACKS: 8
+    NUM_HG_DEPTH: 4

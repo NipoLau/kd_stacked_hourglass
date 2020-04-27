@@ -1,0 +1,7 @@
+MODEL:
+  NAME: 'student_hourglass'
+  PRETRAINED: 'experiments/output/checkpoint.pth'
+  EXTRA:
+    NUM_FEATURES: 128
+    NUM_STACKS: 4
+    NUM_HG_DEPTH: 4
