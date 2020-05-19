@@ -21,9 +21,11 @@ class MPIIDataset(Dataset):
         self.sigma = cfg.MODEL.SIGMA
         self.flipped_joints = [5, 4, 3, 2, 1, 0, 6, 7, 8, 9, 15, 14, 13, 12, 11, 10]
         self.matched_joints = [[0, 5], [1, 4], [2, 3], [10, 15], [11, 14], [12, 13]]
+        self.parent_ids = [1, 2, 6, 6, 3, 4, 6, 6, 7, 8, 11, 12, 7, 7, 13, 14]
         self.flip = cfg.DATASET.FLIP
         self.scale_factor = cfg.DATASET.SCALE_FACTOR
         self.rot_factor = cfg.DATASET.ROT_FACTOR
+        self.soft = cfg.TRAIN.SOFT
 
     def _get_db(self):
         db_file = os.path.join(self.root, 'annot', self.image_set + '.h5')
@@ -77,6 +79,7 @@ class MPIIDataset(Dataset):
                 if random.random() <= 0.6 else 0
 
             if self.flip and random.random() <= 0.5:
+                image_numpy = self.preprocess(image_numpy.astype(np.float32) / 255)
                 image_numpy = np.flip(image_numpy, axis=1)
                 joints[:, 0] = image_numpy.shape[1] - joints[:, 0] - 1
                 for joint in self.matched_joints:
@@ -111,10 +114,33 @@ class MPIIDataset(Dataset):
 
         meta = {
             'center': center,
-            'scale': scale
+            'scale': scale,
+            'image': db_rec['image']
         }
 
         return image, target, target_vis, meta
+
+    def preprocess(self, data):
+        # random hue and saturation
+        data = cv2.cvtColor(data, cv2.COLOR_RGB2HSV)
+        delta = (np.random.random() * 2 - 1) * 0.2
+        data[:, :, 0] = np.mod(data[:, :, 0] + (delta * 360 + 360.), 360.)
+
+        delta_sature = np.random.random() + 0.5
+        data[:, :, 1] *= delta_sature
+        data[:, :, 1] = np.maximum(np.minimum(data[:, :, 1], 1), 0)
+
+        data = cv2.cvtColor(data, cv2.COLOR_HSV2RGB)
+
+        # adjust brightness
+        delta = (np.random.random() * 2 - 1) * 0.3
+        data += delta
+
+        # adjust contrast
+        mean = data.mean(axis=2, keepdims=True)
+        data = (data - mean) * (np.random.random() + 0.5) + mean
+        data = np.minimum(np.maximum(data, 0), 1)
+        return data
 
     def evaluate(self, cfg, preds, threshold=0.5):
 

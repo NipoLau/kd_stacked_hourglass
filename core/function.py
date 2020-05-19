@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import prettytable as pt
 import time
-from utils.utils import get_final_preds, get_max_preds, nms
+from utils.utils import get_final_preds, get_max_preds, nms, soft_argmax_preds
 
 
 def accuracy(output, target):
@@ -174,9 +174,11 @@ def hint_train(config, model, tmodel, regressor, train_loader, hint_criterion, o
         with torch.no_grad():
             thint, _ = tmodel(input)
 
-        out_hint = regressor(hint)
+        out_hint = regressor[0](hint[0])
 
-        loss = hint_criterion(out_hint, thint)
+        loss = hint_criterion(out_hint, thint[0])
+
+        loss += hint_criterion(regressor[1](hint[1]), thint[1])
 
         optimizer.zero_grad()
         loss.backward()
@@ -212,7 +214,31 @@ def evaluate(config, val_loader, val_dataset, model):
             output = (output + output_flipped[:, val_dataset.flipped_joints]) / 2
 
             output = nms(output)
-
+            '''
+            import matplotlib.pyplot as plt
+            preds = get_final_preds(output.cpu().numpy(), meta['center'], meta['scale'], config.MODEL.HEATMAP_SIZE)
+            for id in range(num_images):
+                parent_ids = val_dataset.parent_ids
+                num_joints = val_dataset.num_joints
+                pred = preds[id]
+                vis = target_vis.numpy()[id]
+                fig = plt.figure()
+                plt.axis('off')
+                image = plt.imread(meta['image'][id])
+                plt.imshow(image)
+                plt.scatter(pred[:, 0] * vis, pred[:, 1] * vis, marker='.',color='blue', s=40)
+                x, y = [], []
+                for k in range(num_joints):
+                    x.append([pred[k][0], pred[parent_ids[k]][0]])
+                    y.append([pred[k][1], pred[parent_ids[k]][1]])
+                for k in range(num_joints):
+                    if vis[k]:
+                        plt.plot(x[k], y[k], color='red')
+                plt.tight_layout()
+                plt.subplots_adjust(top=1, bottom=0, left=0, right=1, hspace=0, wspace=0)
+                fig.savefig("results/student/test_{}.jpg".format(i * num_images + id), dpi=600)
+                plt.close()
+            '''
             all_preds[idx:idx + num_images] = get_final_preds(output.cpu().numpy(), meta['center'],
                                                               meta['scale'], config.MODEL.HEATMAP_SIZE)
             idx += num_images

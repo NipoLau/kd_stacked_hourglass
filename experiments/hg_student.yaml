@@ -3,5 +3,11 @@ MODEL:
   PRETRAINED: 'experiments/output/checkpoint.pth'
   EXTRA:
     NUM_FEATURES: 128
-    NUM_STACKS: 4
+    NUM_STACKS: 8
     NUM_HG_DEPTH: 4
+    THICK_PRE_LAYER: True
+    STRIDE_CONV: True
+    SEPARABLE_CONV: True
+    DEPTHWISE_CONV: False
+    TRANSPOSE_CONV: True
+    GROUP_CONV: True

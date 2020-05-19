@@ -51,7 +51,7 @@ class PoseNet(nn.Module):
         # x = imgs.permute(0, 3, 1, 2).contiguous() #x of size 1,3,inpdim,inpdim
         # 对输入图像进行处理，提取高维特征，通道数扩展到 inp_dim - 256
         x = self.pre(imgs)
-        hint = x
+        hint = [x]
 
         combined_hm_preds = []
         for i in range(self.nstack):
@@ -62,6 +62,8 @@ class PoseNet(nn.Module):
             # 获取输出热图，通道数为 oup_dim - 16
             preds = self.outs[i](feature)
             combined_hm_preds.append(preds)
+            if i == self.nstack / 2 - 1:
+                hint.append(feature)
             if i < self.nstack - 1:
                 # 特征图和输出热图各自通过一层 Conv 通道扩展到 inp_dim - 256，与 short_cut 相加，输入到下一个 Hourglass 模块
                 x = x + self.merge_preds[i](preds) + self.merge_features[i](feature)

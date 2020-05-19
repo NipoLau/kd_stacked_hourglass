@@ -24,22 +24,46 @@ def adjust(ans, det):
     return ans
 
 
+def soft_argmax_preds(batch_heatmaps):
+    alpha = 1000
+
+    batch_size, num_joints, width, height = batch_heatmaps.shape
+
+    soft_max = torch.nn.functional.softmax(batch_heatmaps.view(batch_size, num_joints, -1) * alpha, dim=2)
+    soft_max = soft_max.view(batch_heatmaps.shape)
+
+    indices = torch.arange(start=0, end=width * height).unsqueeze(0)
+    indices = indices.view((width, height))
+
+    conv = soft_max * indices
+
+    indices = conv.sum(2).sum(2)
+
+    x = indices % width
+    y = torch.floor(indices / width)
+
+    preds = torch.stack([x, y], dim=2)
+
+    return preds
+
+
 def get_max_preds(batch_heatmaps):
     batch_size = batch_heatmaps.shape[0]
     num_joints = batch_heatmaps.shape[1]
-    width = batch_heatmaps.shape[2]
+    width = batch_heatmaps.shape[3]
 
-    batch_heatmaps = batch_heatmaps.reshape((batch_size, num_joints, -1))
+    batch_heatmaps_reshape = batch_heatmaps.reshape((batch_size, num_joints, -1))
 
-    idx = np.argmax(batch_heatmaps, 2).reshape((batch_size, num_joints, 1))
-    val = np.amax(batch_heatmaps, 2).reshape((batch_size, num_joints, 1))
-
-    preds = np.tile(idx, (1, 1, 2)).astype(np.float32)
-
-    preds[:, :, 0] = preds[:, :, 0] % width
-    preds[:, :, 1] = np.floor(preds[:, :, 1] / width)
+    val = np.amax(batch_heatmaps_reshape, 2).reshape((batch_size, num_joints, 1))
+    idx = np.argmax(batch_heatmaps_reshape, 2).reshape((batch_size, num_joints, 1))
 
     preds_mask = np.tile(np.greater(val, 0.0), (1, 1, 2)).astype(np.float32)
+    # preds = soft_argmax_preds(torch.from_numpy(batch_heatmaps)).numpy()
+
+    preds = np.tile(idx, (1, 1, 2)).astype(np.float32)
+    preds[:, :, 0] = (preds[:, :, 0]) % width
+    preds[:, :, 1] = np.floor((preds[:, :, 1]) / width)
+
     preds *= preds_mask
 
     return preds
@@ -70,7 +94,7 @@ def generate_target(joints, joints_vis, heatmap_size, ratio, sigma):
         mu_x = int(joints[joint_id][0] / ratio + 0.5)
         mu_y = int(joints[joint_id][1] / ratio + 0.5)
 
-        tmp_size = 3 * sigma
+        tmp_size = 2 * sigma
 
         ul = np.array([int(mu_x - tmp_size), int(mu_y - tmp_size)])
         # numpy 索引为 左闭右开，二位高斯分布直径为 2 * tmp_size + 1

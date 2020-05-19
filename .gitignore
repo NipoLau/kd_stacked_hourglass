@@ -1,0 +1,5 @@
+*.pyc
+data/mpii/images/
+experiments/models/checkpoint.pt
+results/
+venv/

@@ -12,26 +12,38 @@ class PoseNet(nn.Module):
         self.num_stacks = extra.NUM_STACKS
         self.num_hg_depth = extra.NUM_HG_DEPTH
         self.num_joints = cfg.MODEL.NUM_JOINTS
+        self.thick_pre_layer = extra.THICK_PRE_LAYER
+        self.stride_conv = extra.STRIDE_CONV
+
+        # thick pre-layer
+        if self.thick_pre_layer:
+            self.num_feats = self.num_feats * 2
 
         self.pre = nn.Sequential(
             nn.Conv2d(3, int(self.num_feats / 4), kernel_size=7, stride=2, padding=3),
             nn.BatchNorm2d(int(self.num_feats / 4)),
             nn.ReLU(),
-            Residual(int(self.num_feats / 4), int(self.num_feats / 2)),
-            nn.MaxPool2d(2, 2),
-            Residual(int(self.num_feats / 2), int(self.num_feats / 2)),
-            Residual(int(self.num_feats / 2), self.num_feats)
+            Residual(cfg, int(self.num_feats / 4), int(self.num_feats / 2)),
+            nn.Conv2d(int(self.num_feats / 2), int(self.num_feats / 2), kernel_size=4, stride=2, padding=1) \
+                if self.stride_conv else nn.MaxPool2d(2, 2),
+            Residual(cfg, int(self.num_feats / 2), int(self.num_feats / 2)),
+            Residual(cfg, int(self.num_feats / 2), int(self.num_feats / 2)) \
+                if self.thick_pre_layer else Residual(cfg, int(self.num_feats / 2), self.num_feats)
         )
+
+        # thin hourglass
+        if self.thick_pre_layer:
+            self.num_feats = self.num_feats // 2
 
         self.hgs = nn.ModuleList([
             nn.Sequential(
-                Hourglass(self.num_hg_depth, self.num_feats)
+                Hourglass(cfg, self.num_hg_depth, self.num_feats)
             ) for i in range(self.num_stacks)
         ])
 
         self.features = nn.ModuleList([
             nn.Sequential(
-                Residual(self.num_feats, self.num_feats),
+                Residual(cfg, self.num_feats, self.num_feats),
                 nn.Conv2d(self.num_feats, self.num_feats, kernel_size=1, stride=1),
                 nn.BatchNorm2d(self.num_feats),
                 nn.ReLU()
@@ -56,14 +68,18 @@ class PoseNet(nn.Module):
     def forward(self, x):
         x = self.pre(x)
         combined_hm_preds = []
-        hint = x
+
+        hint = [x]
 
         for i in range(self.num_stacks):
             hg = self.hgs[i](x)
             feature = self.features[i](hg)
             out = self.outs[i](feature)
             combined_hm_preds.append(out)
-            x = x + self.merge_features[i](feature) + self.merge_outs[i](out)
+            if i == self.num_stacks / 2 - 1:
+                hint.append(feature)
+            if i < self.num_stacks - 1:
+                x = x + self.merge_features[i](feature) + self.merge_outs[i](out)
 
         return hint, combined_hm_preds
 

@@ -6,6 +6,7 @@ from torchvision.transforms import transforms
 from dataset.mpii import MPIIDataset
 from core.function import evaluate
 from torch.nn import DataParallel
+from thop import profile
 import torch.utils.data
 import argparse
 
@@ -28,6 +29,11 @@ def main():
     cfg = get_cfg(args.cfg)
 
     model = eval(cfg.MODEL.NAME + '.get_pose_net')(cfg)
+
+    input = torch.randn(1, 3, 256, 256)
+    macs, params = profile(model, inputs=(input,))
+    print(macs, params)
+
     model = DataParallel(model.cuda())
 
     # load pre-trained teacher network

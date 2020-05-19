@@ -74,8 +74,11 @@ def main():
 
         train_type = 'KD'
 
-        regressor = Conv2d(cfg.MODEL.EXTRA.NUM_FEATURES, tcfg.MODEL.EXTRA.NUM_FEATURES,
-                           kernel_size=1, stride=1).cuda()
+        regressor = [Conv2d(cfg.MODEL.EXTRA.NUM_FEATURES, tcfg.MODEL.EXTRA.NUM_FEATURES,
+                           kernel_size=1, stride=1).cuda() for i in range(2)]
+
+    print(sum(p.numel() for p in model.parameters()))
+    print(sum(p.numel() for p in tmodel.parameters()))
 
     train_dataset = MPIIDataset(
         cfg, cfg.DATASET.ROOT,
