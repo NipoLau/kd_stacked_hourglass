@@ -64,8 +64,8 @@ class PoseNet(nn.Module):
             nn.Conv2d(self.num_joints, self.num_feats,
                       kernel_size=1, stride=1) for i in range(self.num_stacks)
         ])
-
-    def forward(self, x):
+    '''
+        def forward(self, x):
         x = self.pre(x)
         combined_hm_preds = []
 
@@ -82,6 +82,18 @@ class PoseNet(nn.Module):
                 x = x + self.merge_features[i](feature) + self.merge_outs[i](out)
 
         return hint, combined_hm_preds
+    '''
+    def forward(self, x):
+        x = self.pre(x)
+
+        for i in range(self.num_stacks):
+            hg = self.hgs[i](x)
+            feature = self.features[i](hg)
+            out = self.outs[i](feature)
+            if i < self.num_stacks - 1:
+                x = x + self.merge_features[i](feature) + self.merge_outs[i](out)
+
+        return out
 
 
 def get_pose_net(cfg):

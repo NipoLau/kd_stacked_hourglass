@@ -31,8 +31,8 @@ def main():
     model = eval(cfg.MODEL.NAME + '.get_pose_net')(cfg)
 
     input = torch.randn(1, 3, 256, 256)
-    macs, params = profile(model, inputs=(input,))
-    print(macs, params)
+    # macs, params = profile(model, inputs=(input,))
+    # print(macs, params)
 
     model = DataParallel(model.cuda())
 
@@ -51,7 +51,7 @@ def main():
         cfg,
         cfg.DATASET.ROOT,
         cfg.DATASET.TEST_SET,
-        transforms.ToTensor()
+        transforms.ToTensor()   # totensor() 函数自动将每个像素除以 255
     )
 
     valid_loader = torch.utils.data.DataLoader(

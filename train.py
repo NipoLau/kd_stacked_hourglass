@@ -14,6 +14,7 @@ import torch.optim as optim
 import os
 from collections import OrderedDict
 from core.function import evaluate
+from thop import profile
 
 
 def parse_args():
@@ -122,6 +123,8 @@ def main():
 
     print('---------Student Model----------')
     best_perf = name_values['Mean']
+
+    torch.save(model.state_dict(), os.path.join(cfg.TRAIN.OUTPUT, 'checkpoint.pth'))
 
     for k, v in name_values.items():
         print('{} : {}'.format(k, v))

@@ -10,7 +10,9 @@ from utils.utils import get_max_preds
 import torch.utils.data
 import argparse
 import matplotlib.pyplot as plt
-
+import numpy as np
+import time
+import torch.onnx as onnx
 
 def parse_arg():
     parser = argparse.ArgumentParser()
@@ -30,47 +32,35 @@ def main():
     cfg = get_cfg(args.cfg)
 
     model = eval(cfg.MODEL.NAME + '.get_pose_net')(cfg)
-    model = DataParallel(model.cuda())
+    # model = DataParallel(model.cuda())
 
     # load pre-trained teacher network
     state_dict = torch.load(cfg.MODEL.PRETRAINED)
-    if isinstance(state_dict, OrderedDict):
-        new_state_dict = state_dict
-    else:
-        state_dict = state_dict['state_dict']
-        new_state_dict = OrderedDict()
-        for k, v in state_dict.items():
-            new_state_dict[k[6:]] = v
+
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        new_state_dict[k[7:]] = v
     model.load_state_dict(new_state_dict, strict=True)
+    model.eval()
 
-    valid_dataset = MPIIDataset(
-        cfg,
-        cfg.DATASET.ROOT,
-        cfg.DATASET.TEST_SET,
-        transforms.ToTensor()
+    input = torch.randn(1, 3, 256, 256)
+
+    input_names = ["input"]
+    output_names = ["output"]
+
+    onnx.export(
+        model,
+        input,
+        "experiments/output/kd_hourglass.onnx",
+        verbose=True,
+        input_names=input_names,
+        output_names=output_names
     )
 
-    valid_loader = torch.utils.data.DataLoader(
-        valid_dataset,
-        batch_size=cfg.TEST.BATCH_SIZE,
-        shuffle=False,
-        num_workers=cfg.WORKERS,
-        pin_memory=cfg.PIN_MEMORY
-    )
+    end = time.time()
+    output = model(input)
+    print(time.time() - end)
 
-    device = torch.device(cfg.MODEL.DEVICE + ":" + cfg.MODEL.DEVICE_ID)
-
-    for i, (input, target, target_vis, meta) in enumerate(valid_loader):
-        input = input.to(device)
-        _, output = model(input)
-        input = input.cpu().numpy()
-        output = output.cpu().numpy()
-
-        plt.figure()
-
-        for k in range(len(output)):
-            ax = plt.subplot(4, 6, k + 1)
-            ax.imshow(input[k])
 
 if __name__ == '__main__':
     main()
